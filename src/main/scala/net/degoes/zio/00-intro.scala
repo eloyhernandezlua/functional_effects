@@ -2,6 +2,8 @@ package net.degoes.zio
 
 import zio._
 
+import scala.util.Try
+
 /*
  * INTRODUCTION
  *
@@ -33,24 +35,32 @@ import zio._
  */
 
 object ZIOModel {
-
   /**
    * EXERCISE
    *
    * Implement all missing methods on the ZIO companion object.
    */
   object ZIO {
-    def succeed[A](a: => A): ZIO[Any, Nothing, A] = ???
+    def succeed[A](a: => A): ZIO[Any, Nothing, A] =
+      ZIO(_ => Right(a))
 
-    def fail[E](e: => E): ZIO[Any, E, Nothing] = ???
+    def fail[E](e: => E): ZIO[Any, E, Nothing] =
+      ZIO(_ => Left(e))
 
-    def attempt[A](sideEffect: => A): ZIO[Any, Throwable, A] = ???
+    def attempt[A](sideEffect: => A): ZIO[Any, Throwable, A] =
+      ZIO(_ => Try(sideEffect).toEither)
 
-    def environment[R]: ZIO[R, Nothing, R] = ???
+    def environment[R]: ZIO[R, Nothing, R] =
+      ZIO(r => Right(r))
 
-    def access[R, A](f: R => A): ZIO[R, Nothing, A] = ???
+    def access[R, A](f: R => A): ZIO[R, Nothing, A] =
+      ZIO(r => Right(f(r)))
 
-    def accessZIO[R, E, A](f: R => ZIO[R, E, A]): ZIO[R, E, A] = ???
+    def accessZIO[R, E, A](f: R => ZIO[R, E, A]): ZIO[R, E, A] = {
+      //ZIO(r => f(r).run(r))
+      ZIO.environment.flatMap(f)
+      //ZIO.environment.flatMap(r => f(r))
+    }
   }
 
   /**
@@ -58,16 +68,32 @@ object ZIOModel {
    *
    * Implement all missing methods on the ZIO class.
    */
-  final case class ZIO[-R, +E, +A](run: R => Either[E, A]) { self =>
-    def map[B](f: A => B): ZIO[R, E, B] = ???
+  final case class ZIO[-R, +E, +A](protected val run: R => Either[E, A]) { self =>
+    def map[B](f: A => B): ZIO[R, E, B] = {
+      //ZIO(r => run(r).map(a => f(a)))
+      //ZIO(r => run(r).flatMap(a => Right(f(a))))
+     //flatMap(a => ZIO(_ => Right(f(a))))
+     flatMap(a => ZIO.succeed(f(a)))
+    }
 
     def flatMap[R1 <: R, E1 >: E, B](f: A => ZIO[R1, E1, B]): ZIO[R1, E1, B] =
-      ???
+//      ZIO.accessZIO(r => run(r) match {
+//        case Left(e) => ZIO(r=>Left(e))
+//        case Right(a) => f(a)
+//      })
+
+//    ZIO(r => run(r) match {
+//      case Left(e) => Left(e)
+//      case Right(a) => f(a).run(r)
+//    })
+
+        ZIO(r => run(r).flatMap(a => f(a).run(r)))
 
     def zip[R1 <: R, E1 >: E, B](that: ZIO[R1, E1, B]): ZIO[R1, E1, (A, B)] =
-      ???
+      flatMap(a => that.map(b => (a,b)))
 
-    def either: ZIO[R, Nothing, Either[E, A]] = ???
+    def either: ZIO[R, Nothing, Either[E, A]] =
+      ZIO(r =>  Right(run(r)))
 
     def provide(r: R): ZIO[Any, E, A] = ???
 
