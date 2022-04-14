@@ -1,5 +1,6 @@
 package net.degoes.zio
 
+import zio.Console.printLine
 import zio._
 
 import scala.util.Try
@@ -68,7 +69,7 @@ object ZIOModel {
    *
    * Implement all missing methods on the ZIO class.
    */
-  final case class ZIO[-R, +E, +A](protected val run: R => Either[E, A]) { self =>
+  final case class ZIO[-R, +E, +A](run: R => Either[E, A]) { self =>
     def map[B](f: A => B): ZIO[R, E, B] = {
       //ZIO(r => run(r).map(a => f(a)))
       //ZIO(r => run(r).flatMap(a => Right(f(a))))
@@ -95,7 +96,8 @@ object ZIOModel {
     def either: ZIO[R, Nothing, Either[E, A]] =
       ZIO(r =>  Right(run(r)))
 
-    def provide(r: R): ZIO[Any, E, A] = ???
+    def provide(r: R): ZIO[Any, E, A] =
+      ZIO(_ => run(r))
 
     def orDie(implicit ev: E <:< Throwable): ZIO[R, Nothing, A] =
       ZIO(r => self.run(r).fold(throw _, Right(_)))
@@ -130,11 +132,11 @@ object ZIOTypes {
    *
    * Provide definitions for the ZIO type aliases below.
    */
-  type Task[+A]     = ???
-  type UIO[+A]      = ???
-  type RIO[-R, +A]  = ???
-  type IO[+E, +A]   = ???
-  type URIO[-R, +A] = ???
+  type Task[+A]     = ZIO[Any, Throwable, A] // Futuro
+  type UIO[+A]      = ZIO[Any, Nothing ,A] // Futuro que no falla
+  type RIO[-R, +A]  = ZIO[R, Throwable,A] // Efecto con dependencia
+  type IO[+E, +A]   = ZIO[Any, E, A] // Efecto que puede fallar o no con error en especifico
+  type URIO[-R, +A] = ZIO[R, Nothing, A] // Efecto con dependencia infalible
 }
 
 object SuccessEffect extends App {
@@ -148,10 +150,11 @@ object SuccessEffect extends App {
    * `ExitCode`.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    ZIO.succeed(successExitCode)
+  //override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] = ???
 }
 
-object HelloWorld extends App {
+object HelloWorld extends ZIOAppDefault {
   import Console.printLine
 
   /**
@@ -162,10 +165,13 @@ object HelloWorld extends App {
    * effect into another one that produces an exit code.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    printLine("Hello World!").exitCode
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] =
+    printLine("Hello World!")
 }
 
-object SimpleMap extends App {
+object SimpleMap extends ZIOAppDefault {
   import Console.readLine
 
   /**
@@ -177,9 +183,13 @@ object SimpleMap extends App {
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
     ???
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] = {
+    readLine.map(_.length)
+  }
 }
 
-object PrintSequenceZip extends App {
+object PrintSequenceZip extends ZIOAppDefault {
   import Console.printLine
 
   /**
@@ -190,9 +200,21 @@ object PrintSequenceZip extends App {
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
     ???
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] = {
+
+    for {
+      _ <- printLine("1")
+      _ <- printLine("2")
+      _ <- printLine("3")
+    }yield()
+
+    //printLine("1").flatMap(_ => printLine("2").flatMap(_ => printLine("3")))
+  }
+
 }
 
-object PrintSequence extends App {
+object PrintSequence extends ZIOAppDefault {
   import Console.printLine
 
   /**
@@ -203,9 +225,12 @@ object PrintSequence extends App {
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
     ???
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] =
+    printLine("algo")*>printLine("algo mas")*>printLine("algo algo mas")
 }
 
-object PrintReadSequence extends App {
+object PrintReadSequence extends ZIOAppDefault {
   import Console.{ printLine, readLine }
 
   /**
@@ -217,9 +242,12 @@ object PrintReadSequence extends App {
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
     ???
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] =
+    printLine("Hit Enter to exit...")*>readLine
 }
 
-object SimpleDuplication extends App {
+object SimpleDuplication extends ZIOAppDefault {
   import Console.printLine
 
   /**
@@ -236,9 +264,12 @@ object SimpleDuplication extends App {
       printLine("Hello again") *>
       printLine("Hello again")
   }.exitCode
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] =
+    printLine("Hello") *> printLine("Hello Again!!!").replicateZIO(3)
 }
 
-object FlatMap extends App {
+object FlatMap extends ZIOAppDefault {
   import Console.{ printLine, readLine }
 
   /**
@@ -259,9 +290,17 @@ object FlatMap extends App {
       readLine *> // Use .flatMap(...) here
       printLine("Your name is: ")
   }.exitCode
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] =
+    for {
+      _ <- printLine("What is your name?")
+      name <- readLine
+      _ <- printLine(s"Your name is: ${name}")
+    }yield()
+
 }
 
-object PromptName extends App {
+object PromptName extends ZIOAppDefault {
   import Console.{ printLine, readLine }
 
   /**
@@ -288,10 +327,14 @@ object PromptName extends App {
     left: ZIO[R, E, A],
     right: ZIO[R, E, B]
   ): ZIO[R, E, B] =
-    ???
+    left.flatMap(_ => right)
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] =
+    printLine("What is your name?") *>
+      readLine.flatMap(name => printLine(s"Your name is: ${name}"))
 }
 
-object ForComprehension extends App {
+object ForComprehension extends ZIOAppDefault {
   import Console.{ printLine, readLine }
 
   /**
@@ -305,6 +348,15 @@ object ForComprehension extends App {
         _ => readLine.flatMap(name => printLine(s"Your name is: ${name}"))
       )
       .exitCode
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] = {
+    for {
+      _ <- printLine("What is your name?")
+      name <- readLine
+      _ <- printLine(s"Your name is ${name}")
+    }yield()
+
+  }
 }
 
 object ForComprehensionBackward extends App {
