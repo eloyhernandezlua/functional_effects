@@ -359,7 +359,7 @@ object ForComprehension extends ZIOAppDefault {
   }
 }
 
-object ForComprehensionBackward extends App {
+object ForComprehensionBackward extends ZIOAppDefault {
   import Console.{ printLine, readLine }
 
   val readInt = readLine.flatMap(string => ZIO(string.toInt)).orDie
@@ -380,9 +380,14 @@ object ForComprehensionBackward extends App {
           else printLine("You are all grown up!")
     } yield ()
   }.exitCode
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] =
+    printLine("How old are you?").flatMap(_ => readInt.map(age => if(age < 18) {
+      printLine("You are a kid")
+    } else { printLine("You are all grown up!")} ))
 }
 
-object NumberGuesser extends App {
+object NumberGuesser extends ZIOAppDefault {
   import Console.{ printLine, readLine }
   import Random._
 
@@ -399,9 +404,16 @@ object NumberGuesser extends App {
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
     ???
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] =
+    for{
+      num <- nextInt
+      guess <- readLine
+      _ <- analyzeAnswer(num, guess)
+    }yield()
 }
 
-object SingleSideEffect extends App {
+object SingleSideEffect extends ZIOAppDefault {
 
   /**
    * EXERCISE
@@ -409,20 +421,25 @@ object SingleSideEffect extends App {
    * Using ZIO.attempt, convert the side-effecting of `println` into a pure
    * functional effect.
    */
-  def myPrintLn(line: String): Task[Unit] = ???
+  def myPrintLn(line: String): Task[Unit] =
+    ZIO.attempt(println(line))
 
   def run(args: List[String]) =
     myPrintLn("Hello World!").exitCode
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] =
+    myPrintLn("asdf")
 }
 
-object MultipleSideEffects extends App {
+object MultipleSideEffects extends ZIOAppDefault {
 
   /**
    * Using `ZIO.attempt`, wrap Scala's `println` method to lazily convert it
    * into a functional effect, which describes the action of printing a line
    * of text to the console, but which does not actually perform the print.
    */
-  def printLine(line: String): Task[Unit] = ???
+  def printLine(line: String): Task[Unit] =
+    ZIO.attempt(println(line))
 
   /**
    * Using `ZIO.attempt`, wrap Scala's `scala.io.StdIn.readLine()` method to
@@ -430,7 +447,8 @@ object MultipleSideEffects extends App {
    * of printing a line of text to the console, but which does not actually
    * perform the print.
    */
-  val readLine: Task[String] = ???
+  val readLine: Task[String] =
+    ZIO.attempt(scala.io.StdIn.readLine())
 
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] = {
     for {
@@ -439,4 +457,12 @@ object MultipleSideEffects extends App {
       _    <- printLine(s"Good to meet you, ${name}!")
     } yield ()
   }.exitCode
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] =
+    for {
+      _    <- printLine("Hello, what is your name?")
+      name <- readLine
+      _    <- printLine(s"Good to meet you, ${name}!")
+    } yield ()
+
 }

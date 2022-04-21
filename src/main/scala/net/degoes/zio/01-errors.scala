@@ -18,7 +18,7 @@ import zio._
  * rich underlying model of errors that ZIO uses internally.
  */
 
-object ErrorConstructor extends App {
+object ErrorConstructor extends ZIOAppDefault {
   import zio.Console._
 
   /**
@@ -28,10 +28,14 @@ object ErrorConstructor extends App {
    * string value, such as "Uh oh!". Explain the type signature of the
    * effect.
    */
-  val failed: ZIO[Any, String, Nothing] = ???
+  val failed: ZIO[Any, String, Nothing] =
+    ZIO.fail("Uh oh!")
 
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
     failed.foldZIO(printLine(_), printLine(_)).exitCode
+
+  override def run: ZIO[ZEnv with ZIOAppArgs with Scope, Any, Any] =
+    failed.foldZIO(printLine(_), printLine(_))
 }
 
 object ErrorRecoveryOrElse extends App {
@@ -156,7 +160,7 @@ object ErrorNarrowing extends App {
    */
   val myReadLine: IO[IOException, String] = ???
 
-  def myPrintLn(line: String): UIO[Unit] = UIO(println(line))
+  def myPrintLn(line: String): UIO[Unit] = ??? //UIO(println(line))
 
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
     (for {
@@ -178,19 +182,19 @@ object AlarmApp extends App {
    * the user to enter a decimal number of seconds. Use `refineToOrDie` to
    * narrow the error type as necessary.
    */
-  lazy val getAlarmDuration: ZIO[Has[Console], IOException, Duration] = {
-    def parseDuration(input: String): IO[NumberFormatException, Duration] =
-      ???
+//  lazy val getAlarmDuration: ZIO[Has[Console], IOException, Duration] = {
+//    def parseDuration(input: String): IO[NumberFormatException, Duration] =
+//      ???
+//
+//    def fallback(input: String): ZIO[Has[Console], IOException, Duration] =
+//      ???
 
-    def fallback(input: String): ZIO[Has[Console], IOException, Duration] =
-      ???
-
-    for {
-      _        <- printLine("Please enter the number of seconds to sleep: ")
-      input    <- readLine
-      duration <- parseDuration(input) orElse fallback(input)
-    } yield duration
-  }
+//    for {
+//      _        <- printLine("Please enter the number of seconds to sleep: ")
+//      input    <- readLine
+//      duration <- parseDuration(input) orElse fallback(input)
+//    } yield duration
+  //}
 
   /**
    * EXERCISE
